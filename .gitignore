@@ -1,0 +1,35 @@
+# ==========================================
+# 1. .NET / C# Build Outputs (CRITICAL)
+# ==========================================
+# Excludes the 'bin' and 'obj' directories visible at the top of your folder tree
+bin/
+obj/
+# ==========================================
+# 2. IDE and User-Specific Files
+# ==========================================
+# Visual Studio / VS Code configurations
+.vs/
+.vscode/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# ==========================================
+# 3. Python Artifacts (For test_controller.py)
+# ==========================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments if you create them locally
+.venv/
+venv/
+ENV/
+
+# ==========================================
+# 4. Windows System Files
+# ==========================================
+Thumbs.db
+desktop.ini
