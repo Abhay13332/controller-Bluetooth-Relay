@@ -71,7 +71,8 @@ public static class Program
             if (!backgroundMode)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("[Input Interceptor] Active! Swallowing desktop keystrokes from Steam/GameBar.");
+                Console.WriteLine("[Input Interceptor] Active! Swallowing synthetic keystrokes, mouse moves, and clicks.");
+                Console.WriteLine("                    Xbox Guide GameBar capture suppressed.");
                 Console.WriteLine("                    Physical keyboard & mouse are 100% usable.");
                 Console.ResetColor();
             }
@@ -263,9 +264,13 @@ public static class Program
                         _                               => "XBOX"
                     };
 
+                    string interceptInfo = (InputInterceptor.InterceptedKeysCount > 0 || InputInterceptor.InterceptedMouseEventsCount > 0)
+                        ? $"|Swallowed: {InputInterceptor.InterceptedKeysCount}k/{InputInterceptor.InterceptedMouseEventsCount}m"
+                        : "";
+
                     string subInfo = bleServer.SubscribedClientCount > 0
-                        ? $"[{layoutTag}|Android: {bleServer.SubscribedClientCount}|Sent: #{bleServer.TotalPacketsSent:D5}]"
-                        : $"[{layoutTag}|Waiting Android...]";
+                        ? $"[{layoutTag}|Android: {bleServer.SubscribedClientCount}|Sent: #{bleServer.TotalPacketsSent:D5}{interceptInfo}]"
+                        : $"[{layoutTag}|Waiting Android...{interceptInfo}]";
 
                     Console.Write($"\r{subInfo} {currentState,-60}");
                 }
@@ -290,7 +295,8 @@ public static class Program
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("[INFO] Steam is detected in the background.");
-                Console.WriteLine("       Our built-in interceptor is swallowing its desktop keystrokes.");
+                Console.WriteLine("       Our interceptor is actively swallowing its synthetic keystrokes & mouse cursor moves.");
+                Console.WriteLine("       (Tip: You can also disable 'Desktop Layout' in Steam Settings -> Controller)");
                 Console.ResetColor();
             }
         }

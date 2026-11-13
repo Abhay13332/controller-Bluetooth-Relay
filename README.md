@@ -1,3 +1,8 @@
+> [!NOTE]
+> This is Ai generated project ,while properly working and tested with xbox controller. \
+> Use hidhide so input are not captured by windows
+
+
 # Xbox Controller -> Android Bluetooth Gamepad Bridge (Optimized)
 
 A high-performance Windows background application that reads inputs from a wired Xbox controller connected to your PC and forwards them to your Android device by emulating a **Bluetooth Low Energy (BLE) HID Gamepad**.
@@ -7,7 +12,7 @@ A high-performance Windows background application that reads inputs from a wired
 ## 🚀 Key Improvements & Optimizations
 
 1. **Input Interceptor (Swallows Controller Typing in Windows):**
-   * Automatically intercepts and swallows synthetic keystrokes injected by **Steam's "Desktop Layout"** or **Windows Game Bar** (e.g. A mapped to Enter, B mapped to Backspace/Esc, D-pad mapped to arrows).
+   * Automatically intercepts and swallows synthetic keystrokes injected by **Steam's "Desktop Layout"** or **Windows Game Bar** (e.g. A mapped to Enter, B mapped to Backspace/Esc, D-pad mapped to arrows). when setup with hidhide.
    * **Your physical keyboard and mouse remain 100% functional** for normal PC work.
 2. **Fixed Android Input Delivery (Linux UHID Standard):**
    * Prepends the standard `0x01` Report ID header matching Android's kernel Linux UHID driver expectations.
@@ -58,7 +63,7 @@ If Steam is running, Steam translates your controller into a mouse/keyboard on y
 4. Click the gear icon > select **Disable Steam Input** (or choose a blank template).
 5. Alternatively, right-click the Steam tray icon and select **Exit Steam** while gaming on Android.
 
-### Method 3: 100% Total Kernel Cloaking via HidHide (Optional)
+### Method 3: 100% Total Kernel Cloaking via HidHide (Best)
 If you want Windows games and all PC software to completely ignore the Xbox controller:
 1. Install [HidHide](https://github.com/nefarius/HidHide/releases).
 2. Double-click [`tools\setup_hidhide.bat`](tools/setup_hidhide.bat) to automatically whitelist `BluetoothGamepadBridge` and cloak the Xbox controller from the rest of Windows.

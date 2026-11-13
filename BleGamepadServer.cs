@@ -19,6 +19,8 @@ public sealed class BleGamepadServer : IDisposable
     private byte[] _pendingReport = GamepadState.Default.ToBytes();
     private int _isTransmitting = 0;
     private readonly object _lock = new();
+    private readonly object _advLock = new();
+    private bool _isAdvertisingDesired = false;
 
     public bool IsAdvertising { get; private set; }
     public int SubscribedClientCount => _reportCharacteristic?.SubscribedClients.Count ?? 0;
@@ -199,13 +201,8 @@ public sealed class BleGamepadServer : IDisposable
             Log("[Bluetooth] Starting BLE Advertising as Gamepad...");
             _serviceProvider.AdvertisementStatusChanged += OnAdvertisementStatusChanged;
 
-            var advParameters = new GattServiceProviderAdvertisingParameters
-            {
-                IsConnectable = true,
-                IsDiscoverable = true
-            };
-            _serviceProvider.StartAdvertising(advParameters);
-            IsAdvertising = true;
+            _isAdvertisingDesired = true;
+            TryStartAdvertising();
 
             Log("[SUCCESS] BLE Gamepad GATT Server is active and advertising!");
             Log("[INFO] Open Bluetooth on your Android device, find your PC, and tap to pair!");
@@ -218,28 +215,52 @@ public sealed class BleGamepadServer : IDisposable
         }
     }
 
+    private void TryStartAdvertising()
+    {
+        lock (_advLock)
+        {
+            if (_serviceProvider == null || !_isAdvertisingDesired) return;
+            // CRUCIAL: Never start advertising while Android is already connected/subscribed!
+            // Restarting advertising resets BLE channels and drops existing connections.
+            if (SubscribedClientCount > 0) return;
+            if (_serviceProvider.AdvertisementStatus == GattServiceProviderAdvertisementStatus.Started) return;
+
+            try
+            {
+                var advParams = new GattServiceProviderAdvertisingParameters
+                {
+                    IsDiscoverable = true,
+                    IsConnectable = true
+                };
+                _serviceProvider.StartAdvertising(advParams);
+                IsAdvertising = true;
+                Log("[Bluetooth] Advertising active for incoming connections.");
+            }
+            catch (Exception ex)
+            {
+                Log($"[Bluetooth] Warning: Could not start advertising: {ex.Message}");
+            }
+        }
+    }
+
     private void OnAdvertisementStatusChanged(GattServiceProvider sender, GattServiceProviderAdvertisementStatusChangedEventArgs args)
     {
         Log($"[Bluetooth] Advertisement status: {args.Status}, Error: {args.Error}");
-        if (args.Status == GattServiceProviderAdvertisementStatus.Aborted ||
-            args.Status == GattServiceProviderAdvertisementStatus.Stopped)
+
+        // Only handle unexpected Aborted status when no client is currently connected
+        if (args.Status == GattServiceProviderAdvertisementStatus.Aborted)
         {
-            // Auto-recover advertising so paired devices can reconnect without unpairing
-            Task.Run(async () =>
+            if (SubscribedClientCount == 0 && _isAdvertisingDesired)
             {
-                await Task.Delay(1000);
-                try
+                Task.Run(async () =>
                 {
-                    var advParams = new GattServiceProviderAdvertisingParameters
+                    await Task.Delay(2000);
+                    if (SubscribedClientCount == 0 && _isAdvertisingDesired)
                     {
-                        IsDiscoverable = true,
-                        IsConnectable = true
-                    };
-                    sender.StartAdvertising(advParams);
-                    Log("[Bluetooth] Advertising auto-resumed for reconnects!");
-                }
-                catch { }
-            });
+                        TryStartAdvertising();
+                    }
+                });
+            }
         }
     }
 
@@ -270,39 +291,36 @@ public sealed class BleGamepadServer : IDisposable
     {
         int count = sender.SubscribedClients.Count;
         Log($"\n[Bluetooth] Android connection state changed! Active Subscribers: {count}");
-        foreach (var client in sender.SubscribedClients)
-        {
-            try
-            {
-                client.Session.MaintainConnection = true;
-            }
-            catch { }
-            Log($"[Bluetooth] -> Subscribed device ID: {client.Session.DeviceId.Id}");
-        }
-        ClientSubscriptionChanged?.Invoke(count);
 
-        // When a client disconnects (subscribers drops to 0), refresh advertising
-        // so Android can discover and reconnect immediately without unpairing!
-        if (count == 0 && IsAdvertising)
+        if (count > 0)
         {
-            Task.Run(async () =>
+            foreach (var client in sender.SubscribedClients)
             {
-                await Task.Delay(1000);
                 try
                 {
-                    _serviceProvider?.StopAdvertising();
-                    await Task.Delay(300);
-                    var advParams = new GattServiceProviderAdvertisingParameters
-                    {
-                        IsDiscoverable = true,
-                        IsConnectable = true
-                    };
-                    _serviceProvider?.StartAdvertising(advParams);
-                    Log("[Bluetooth] Ready for reconnect! Advertising refreshed.");
+                    client.Session.MaintainConnection = true;
                 }
                 catch { }
-            });
+                Log($"[Bluetooth] -> Subscribed device ID: {client.Session.DeviceId.Id}");
+            }
         }
+        else
+        {
+            // When all clients disconnect, resume advertising so Android can reconnect smoothly
+            if (_isAdvertisingDesired)
+            {
+                Task.Run(async () =>
+                {
+                    await Task.Delay(1000);
+                    if (SubscribedClientCount == 0 && _isAdvertisingDesired)
+                    {
+                        TryStartAdvertising();
+                    }
+                });
+            }
+        }
+
+        ClientSubscriptionChanged?.Invoke(count);
     }
 
     /// <summary>
@@ -387,7 +405,8 @@ public sealed class BleGamepadServer : IDisposable
 
     public void Stop()
     {
-        if (_serviceProvider != null && IsAdvertising)
+        _isAdvertisingDesired = false;
+        if (_serviceProvider != null)
         {
             try
             {
